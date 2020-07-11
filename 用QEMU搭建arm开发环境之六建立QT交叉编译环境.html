@@ -1,0 +1,267 @@
+<html lang="zh">
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>1.下载并编译QT4</h1>
+
+<p>官方下载地址:<a href="https://download.qt.io/archive/qt/4.8/4.8.7/" rel="nofollow">https://download.qt.io/archive/qt/4.8/4.8.7/</a></p>
+
+<p>如果官方下载慢可以从这里下载:</p>
+
+<blockquote>
+<p>链接：https://pan.baidu.com/s/1SOsVu6--3ujsS9u9l9UIHA <br />
+提取码：83dw </p>
+</blockquote>
+
+<p>QT的编译也需要交叉编译环境,但是我们之前编译内核的时候已经建立的交叉编译环境就可以用.</p>
+
+<p>解压缩上面下载的原程序包,然后编译:</p>
+
+<blockquote>
+<p>tar xvf qt-everywhere-opensource-src-4.8.7.tar.gz</p>
+
+<p>cd qt-everywhere-opensource-src-4.8.7</p>
+
+<p>./configure -prefix /usr/local/qt-4.8.7-install -opensource -confirm-license -embedded arm -host-little-endian -no-cups -no-3dnow -nomake examples -nomake demos -nomake docs -xplatform /qws/linux-arm-gnueabi-g++ -little-endian -no-webkit</p>
+
+<p> </p>
+</blockquote>
+
+<p>上面命令中参数-prefix /usr/local/qt-4.8.7-install是指定编译后安装文件到/usr/local/qt-4.8.7-install,参数-opensource选择开源方式,参数-confirm-license自动确认授权,参数 -embedded按照嵌入式设备模式编译,参数-xplatform指定编译目标平台的编译器配置文件(下面详细解释),其他参数大部分是设定不编译哪些不必要的模块.</p>
+
+<p>由于这套源代码是给所有平台编译qt环境的,所以需要配置编译的目标平台是什么,编译的时候使用什么交叉编译器.这些配置都放在mkspecs/目录下,比如我们指定的是mkspecs/qws/linux-arm-gnueabi-g++目录,那么在这个目录下面有两个文件.qmake.conf和qplatformdefs.h,和交叉编译相关的主要是第一个文件.内容如下:</p>
+
+<blockquote>
+<p>#<br />
+# qmake configuration for building with arm-none-linux-gnueabi-g++<br />
+#</p>
+
+<p>include(../../common/linux.conf)<br />
+include(../../common/gcc-base-unix.conf)<br />
+include(../../common/g++-unix.conf)<br />
+include(../../common/qws.conf)</p>
+
+<p># modifications to g++.conf<br />
+QMAKE_CC                = arm-none-linux-gnueabi-gcc<br />
+QMAKE_CXX               = arm-none-linux-gnueabi-g++<br />
+QMAKE_LINK              = arm-none-linux-gnueabi-g++<br />
+QMAKE_LINK_SHLIB        = arm-none-linux-gnueabi-g++</p>
+
+<p># modifications to linux.conf<br />
+QMAKE_AR                = arm-none-linux-gnueabi-ar cqs<br />
+QMAKE_OBJCOPY           = arm-none-linux-gnueabi-objcopy<br />
+QMAKE_STRIP             = arm-none-linux-gnueabi-strip</p>
+
+<p>load(qt_config)<br />
+ </p>
+</blockquote>
+
+<p>我们使用之前编译内核的时候安装的gcc-4.6-arm-linux-gnueabi,该编译器所有命令前缀都是arm-none-linux-gnueabi-,所以直接使用这个文件就行.如果你的编译器和我不一样,你可以修改上述文件,把arm-none-linux-gnueabi-替换为你的编译器前缀即可.</p>
+
+<p>另外,如果你之前定义过QMAKESPEC环境变量,可能会影响编译的结果.请首先清除环境变量QMAKESPEC</p>
+
+<blockquote>
+<p>export QMAKESPEC=""</p>
+</blockquote>
+
+<p>编译成功会出现类似下面的提示:</p>
+
+<blockquote>
+<p>Qt is now configured for building. Just run 'make'.<br />
+Once everything is built, you must run 'make install'.<br />
+Qt will be installed into /usr/local/qt-4.8.7-install</p>
+
+<p>To reconfigure, run 'make confclean' and 'configure'.</p>
+</blockquote>
+
+<p>这时候依次运行下面的命令就分别编译(make)和安装(make install)qt-4.8.7开发环境了</p>
+
+<blockquote>
+<p>make</p>
+
+<p>sudo make install</p>
+</blockquote>
+
+<p>安装成功后,可以使用qmake --version命令来检查是否安装成功.正常情况下,你会看到类似下面的内容:</p>
+
+<blockquote>
+<p>QMake version 2.01a<br />
+Using Qt version 4.8.7 in /usr/local/qt-4.8.7-install/lib</p>
+</blockquote>
+
+<p>如果找不到qmake可能是环境变量没有配置:</p>
+
+<p>export QMAKESPEC=/usr/local/qt-4.8.6-install/mkspecs/linux-arm-gnueabi-g++</p>
+
+<p>如果你有多个qt版本,可以使用如下命令来切换你刚才安装的qt-4.8.7为默认版本</p>
+
+<blockquote>
+<p>qtchooser -install -f default /usr/local/qt-4.8.7-install/bin/qmake</p>
+</blockquote>
+
+<h1><br />
+2.编写第一个QT程序QTQEMU</h1>
+
+<p>qt编译环境建立成功后,我们分别编译最简单的qt程序,第一个是不带GUI界面的,第二个是带GUI界面的.</p>
+
+<h2>编写第一个不带GUI界面的QT程序</h2>
+
+<pre>
+<code>mkdir src
+
+cd src
+
+mkdir hello
+
+cd hello
+
+vi hello1.cpp</code></pre>
+
+<p>然后输入如下内容:</p>
+
+<pre>
+<code>#include &lt;QApplication&gt;
+#include &lt;QDebug&gt;
+int main(int argc,char *argv[])
+{
+    qDebug("Hello, welcome to Qt world!");
+    return 0;
+}
+</code></pre>
+
+<p>保存退出后输入如下命令编译:</p>
+
+<pre>
+<code>qmake -project hello1.cpp
+qmake hello.pro
+make</code></pre>
+
+<p>编译成功后你会看到在src/hello目录下出现一个hello的文件,如果你使用命令file hello可以看到类似如下的信息;</p>
+
+<blockquote>
+<p>$ file hello</p>
+
+<p>hello: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux.so.3, for GNU/Linux 3.2.0, BuildID[sha1]=a514cc28eca331ebb67b4e3f063a4adee300e38c, not stripped</p>
+</blockquote>
+
+<p>上述信息是说明hello这个文件是一个32为的可执行文件,架构是ARM,使用的指令集是EABI5 version 1</p>
+
+<h2>编写第一个带GUI界面的QT程序</h2>
+
+<p>参照上面在src目录下建立于一个qtui目录,然后建立一个main.cpp,这个cpp文件的内容如下:</p>
+
+<pre>
+<code>#include&lt;iostream&gt;
+#include&lt;QApplication&gt;
+#include&lt;QWidget&gt;
+#include&lt;QPushButton&gt;
+#include&lt;QPoint&gt;
+#include&lt;QDebug&gt;
+
+int main(int argc,char** argv)
+{
+    QApplication app(argc,argv);//这个对象只能有一个 单实例
+    QWidget widget;
+    QPushButton button;
+    widget.move(200,100);//位置
+    widget.resize(300,400);//宽高
+   
+    button.setParent(&amp;widget);//给它设置父窗口 就是嵌套到大窗口上
+    button.move(100,100);
+    button.setText("hello");
+    button.resize(50,20);
+    widget.show();//顶级窗口出现 可以最大最小化
+    qDebug()&lt;&lt;"button pos:"&lt;&lt;button.pos()&lt;&lt;" "&lt;&lt;button.size()&lt;&lt;endl;
+    
+    return app.exec();
+}
+</code></pre>
+
+<p>然后执行下面的命令编译:</p>
+
+<pre>
+<code>qmake -project main.cpp
+qmake qtui.pro
+make</code></pre>
+
+<p>编译成功后,会在src/qtui目录下出现一个qtui的文件.</p>
+
+<h1><br />
+3.在BusyBox文件系统下增加QT运行环境</h1>
+
+<p>QT程序编译好后我们需要到QEMU上去执行,在这之前,我们首先要在之前编译好的BusyBox文件系统基础上增加QT的运行环境.就是说吧刚才安装在HOST端的文件复制到嵌入式文件系统中(实际上bin目录下面的文件是可以不复制的,这部分文件只能在HOST运行)</p>
+
+<pre>
+<code>sudo mount rootfsqt4.7.ext3 mnt
+cd mnt
+cd usr/local
+cp -rf /usr/local/qt-4.8.6-install .
+cd ../..
+</code></pre>
+
+<p>然后我们将刚才编译文件复制到文件系统</p>
+
+<pre>
+<code>mkdir home
+cd home
+mkdir root
+cd root
+cp ~/src/hello/hello .
+cp ~/src/qtui/qtui .</code></pre>
+
+<p>所有文件复制完成后,我们解除挂载,准备运行QEMU</p>
+
+<pre>
+<code>cd ../../..
+sudo umount mnt</code></pre>
+
+<h1><br />
+4.运行QTQEMU</h1>
+
+<p>现在启动QEMU来看下我们刚才编译和部署的结果.</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 1024M -kernel zImage -dtb vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0 rw console=ttyAMA0" -sd rootfsqt4.7.ext3 -smp 4 -serial stdio</p>
+</blockquote>
+
+<p>QEMU运行起来后,我们先试下不带GUI的QT是否工作正常.如果出现如下信息说明运行成功:</p>
+
+<blockquote>
+<p>Please press Enter to activate this console. <br />
+/ # cd home/root<br />
+/home/root # ls<br />
+qthello  qtui     test     test.c<br />
+/home/root # ./qthello<br />
+Hello, welcome to Qt world!<br />
+/home/root # </p>
+</blockquote>
+
+<p>如果不成功请检查之前复制文件或者编译程序是否正确.</p>
+
+<p>下面我们来试下带GUI的QT.输入如下命令:其中-qws是设置qt运行的窗体系统的.</p>
+
+<blockquote>
+<p>./qtui -qws</p>
+</blockquote>
+
+<p>如果出现下面的界面就说明启动成功.</p>
+
+<p><img alt="" height="553" src="https://img-blog.csdnimg.cn/20200710181029611.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2xpb25maXJl,size_16,color_FFFFFF,t_70" width="595" /></p>
+
+<p> </p>
+
+<p><strong>鸣谢:</strong>本文部分资料来自下面的链接,感谢相关作者的贡献,如果侵权或需删除请联系我:xiongga@emsym.com</p>
+
+<p><a href="https://doc.qt.io/archives/qt-4.8/qt-embedded-install.html" rel="nofollow">https://doc.qt.io/archives/qt-4.8/qt-embedded-install.html</a></p>
+
+<p><a href="https://wiki.qt.io/DirectFBAndQt" rel="nofollow">https://wiki.qt.io/DirectFBAndQt</a></p>
+
+<p><a href="https://doc.qt.io/archives/qt-4.8/qt-embeddedlinux-directfb.html" rel="nofollow">https://doc.qt.io/archives/qt-4.8/qt-embeddedlinux-directfb.html</a></p>
+
+<p><a href="https://blog.csdn.net/xyk_code/article/details/19155033">https://blog.csdn.net/xyk_code/article/details/19155033</a></p>
+
+<p><a href="https://blog.csdn.net/qq_34684524/article/details/104999306">https://blog.csdn.net/qq_34684524/article/details/104999306</a></p>
+                                    </div>
+                                </div>
+
+</html>
