@@ -1,0 +1,522 @@
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>1.BusyBox简介</h1>
+
+<p>BusyBox 是一个集成了三百多个最常用Linux命令和工具的软件(注:不同版本可能包含的数量不一样)。BusyBox 包含了一些简单的工具，例如ls、cat和echo等等，还包含了一些更大、更复杂的工具，例grep、find、mount以及telnet。有些人将 BusyBox 称为 Linux 工具里的<a href="https://baike.baidu.com/item/%E7%91%9E%E5%A3%AB%E5%86%9B%E5%88%80/152816" rel="nofollow">瑞士军刀</a>。简单的说BusyBox就好像是个大工具箱，它集成压缩了 Linux 的许多工具和命令，也包含了 Android 系统的自带的shell。</p>
+
+<p>通过BusyBox我们就可以建立最早期的文件系统,执行最常见的文件操作.方便后续运行更高阶的操作系统(如Ubuntu/安卓等).</p>
+
+<h1><br />
+2.BusyBox下载与编译</h1>
+
+<p>官方下载地址:<a href="https://busybox.net/downloads/" rel="nofollow">https://busybox.net/downloads/</a>,我们选择下载了busybox-1.21.0.tar.bz2</p>
+
+<p>如果下载比较慢可以从这里下载:</p>
+
+<blockquote>
+<p>链接：https://pan.baidu.com/s/1rtNI5_lmIMx58McGIzaUWQ <br />
+提取码：lnf4</p>
+</blockquote>
+
+<p>下载后首先解压缩:</p>
+
+<blockquote>
+<p>$ tar xjf busybox-1.21.0.tar.bz2 </p>
+</blockquote>
+
+<p>解压完成后,进入解压缩后的目录执行下面命令完成最初基本配置</p>
+
+<blockquote>
+<p>make defconfig ARCH=arm</p>
+</blockquote>
+
+<p>运行成功后,当前目录会出现一个.config的文件.为了日后运行方便,我们需要手工改成静态编译</p>
+
+<p>你可以直接编辑.config将# CONFIG_STATIC is not set这句话改为CONFIG_STATIC=y</p>
+
+<p>或者你也可以执行下面的命令在菜单上修改:</p>
+
+<blockquote>
+<p>make menuconfig</p>
+</blockquote>
+
+<p>在弹出的操作界面中将<strong>Busybox Settings ---&gt; Build Options ---&gt; [ ] Build BusyBox as a static binary (no shared libs)</strong>选中，让[ ]变成<strong>[*]</strong>，保存退出后再执行如下命令进行编译:</p>
+
+<blockquote>
+<p>ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make install</p>
+</blockquote>
+
+<p>如果编译成功,会在当前目录看到一个_install目录,里面大致是这样的</p>
+
+<pre>
+<code>bin  linuxrc  sbin  usr</code></pre>
+
+<p>这就是最基本的文件系统所需文件了.我们现在开始做一个最简单的文件系统image</p>
+
+<pre>
+<code>dd if=/dev/zero of=rootfs.ext3 bs=1M count=200
+mkfs.ext3 rootfs.ext3
+sudo mount -t ext3 rootfs.ext3 mnt
+cd mnt
+cp -rf busybox-1.21.0/_install/* .
+cd ..
+sudo umount mnt</code></pre>
+
+<p>这个rootfs.ext3就是最简单的文件系统image了.</p>
+
+<p> </p>
+
+<h1>3.QEMU启动内核加BusyBox</h1>
+
+<p>运行下面的命令:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 1024M -kernel zImage -dtb vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0 rw console=ttyAMA0 init=/sbin/init" -sd rootfs.ext3  -smp 4 -serial stdio</p>
+
+<p> </p>
+</blockquote>
+
+<p>启动成功,仔细看日志会发现:</p>
+
+<blockquote>
+<p>can't run '/etc/init.d/rcS': No such file or directory</p>
+
+<p>can't open /dev/tty2: No such file or directory<br />
+can't open /dev/tty4: No such file or directory</p>
+</blockquote>
+
+<p>从日志上看,加载文件系统已经成功了!但是启动/etc/init.d/rcS文件失败了,而且缺少/dev目录.所以我们需要稍微修改一下我们的文件系统</p>
+
+<pre>
+<code class="language-bash">sudo mount rootfs.ext3 mnt
+cd mnt
+sudo mkdir proc sys dev etc etc/init.d
+</code></pre>
+
+<p>然后建立一个名为etc/init.d/rcS文件 </p>
+
+<pre>
+<code class="language-bash">#!/bin/sh
+mount -t proc none /proc
+mount -t sysfs none /sys
+/sbin/mdev -s</code></pre>
+
+<p>给这个文件加上可执行权限,然后解除挂载</p>
+
+<pre>
+<code class="language-bash">sudo chmod +x etc/init.d/rcS
+cd ..
+sudo umount mnt</code></pre>
+
+<p>再次启动文件系统,系统显示如下内容就成功了!</p>
+
+<blockquote>
+<p>EXT4-fs (mmcblk0): mounting ext3 file system using the ext4 subsystem<br />
+EXT4-fs (mmcblk0): mounted filesystem with ordered data mode. Opts: (null)<br />
+VFS: Mounted root (ext3 filesystem) on device 179:0.<br />
+Freeing unused kernel memory: 284K<br />
+random: nonblocking pool is initialized</p>
+
+<p>Please press Enter to activate this console. </p>
+</blockquote>
+
+<p>此时你按下Enter键,就可以输入Linux命令来操作文件了.</p>
+
+<p> </p>
+
+<h1>附录:Linux基本命令介绍</h1>
+
+<p><strong>reboot</strong><br />
+1.作用<br />
+reboot命令的作用是重新启动计算机，它的使用权限是系统管理者。<br />
+2.格式<br />
+reboot [－n] [－w] [－d] [－f] [－i]<br />
+3.主要参数<br />
+－n: 在重开机前不做将记忆体资料写回硬盘的动作。<br />
+－w: 并不会真的重开机，只是把记录写到/var/log/wtmp文件里。<br />
+－d: 不把记录写到/var/log/wtmp文件里（－n这个参数包含了－d）。<br />
+－i: 在重开机之前先把所有与网络相关的装置停止。<br /><br /><strong>mount</strong><br />
+1.作用<br />
+mount命令的作用是加载文件系统，它的用权限是超级用户或/etc/fstab中允许的使用者。<br />
+2.格式<br />
+mount －a [－fv] [－t vfstype] [－n] [－rw][－F] device dir<br />
+3.主要参数<br />
+－h：显示辅助信息。<br />
+－v：显示信息，通常和－f用来除错。<br />
+－a：将/etc/fstab中定义的所有文件系统挂上。<br />
+－F：这个命令通常和－a一起使用，它会为每一个mount的动作产生一个行程负责执行。在系统需要挂上大量NFS文件系统时可以加快加载的速度。<br />
+－f：通常用于除错。它会使mount不执行实际挂上的动作，而是模拟整个挂上的过程，通常会和－v一起使用。<br />
+－t vfstype：显示被加载文件系统的类型。<br />
+－n：一般而言，mount挂上后会在/etc/mtab中写入一笔资料，在系统中没有可写入文件系统的情况下，可以用这个选项取消这个动作。<br />
+4.应用技巧<br />
+在Linux和Unix系统上，所有文件都是作为一个大型树（以/为根）的一部分访问的。要访问CD-ROM上的文件，需要将CD-ROM设备挂装在文件树中的某个挂装点。如果发行版安装了自动挂装包，那么这个步骤可自动进行。在Linux中，如果要使用硬盘、光驱等储存设备，就得先将它加载，当储存设备挂上了之后，就可以把它当成一个目录来访问。挂上一个设备使用mount命令。在使用mount这个指令时，至少要先知道下列三种信息：要加载对象的文件系统类型、要加载对象的设备名称及要将设备加载到哪个目录下。<br />
+（1）Linux可以识别的文件系统<br />
+◆ Windows 95/98常用的FAT 32文件系统：vfat；<br />
+◆ Win NT/2000 的文件系统：ntfs ；<br />
+◆ OS/2用的文件系统：hpfs；<br />
+◆ Linux用的文件系统：ext2、ext3；<br />
+◆ CD-ROM光盘用的文件系统：iso9660。<br />
+虽然vfat是指FAT 32系统，但事实上它也兼容FAT 16的文件系统类型。<br />
+（2）确定设备的名称<br />
+在Linux中，设备名称通常都存在/dev里。这些设备名称的命名都是有规则的，可以用“推理”的方式把设备名称找出来。例如，/dev/hda1这个<br />
+IDE设备，hd是Hard Disk(硬盘)的，sd是SCSI Device，fd是Floppy Device(或是Floppy<br />
+Disk?)。a代表第一个设备，通常IDE接口可以接上4个IDE设备(比如4块硬盘)。所以要识别IDE硬盘的方法分别就是hda、hdb、hdc、<br />
+hdd。hda1中的“1”代表hda的第一个硬盘分区<br />
+(partition)，hda2代表hda的第二主分区，第一个逻辑分区从hda5开始，依此类推。此外，可以直接检查/var/log/messages文件，在该文件中可以找到计算机开机后系统已辨认出来的设备代号。<br />
+（3）查找挂接点<br />
+在决定将设备挂接之前，先要查看一下计算机是不是有个/mnt的空目录，该目录就是专门用来当作挂载点(MountPoint)的目录。建议在/mnt里建几个/mnt/cdrom、/mnt/floppy、/mnt/mo等目录，当作目录的专用挂载点。举例而言，如要挂载下列5个设备，其执行指令可能如下 (假设都是Linux的ext2系统，如果是Windows XX请将ext2改成vfat)：<br />
+软盘 ===&gt;mount －t ext2/dev/fd0 /mnt/floppy<br />
+cdrom ===&gt;mount －t iso9660 /dev/hdc /mnt/cdrom<br />
+SCSI cdrom ===&gt;mount －t iso9660 /dev/sdb /mnt/scdrom<br />
+SCSI cdr ===&gt;mount －t iso9660 /dev/sdc /mnt/scdr<br />
+不过目前大多数较新的Linux发行版本（包括红旗 Linux、中软Linux、Mandrake Linux等）都可以自动挂装文件系统，但Red Hat Linux除外。<br /><br /><strong>umount</strong><br />
+1.作用<br />
+umount命令的作用是卸载一个文件系统，它的使用权限是超级用户或/etc/fstab中允许的使用者。<br />
+2.格式<br />
+unmount －a [－fFnrsvw] [－t vfstype] [－n] [－rw][－F] device dir<br />
+3.使用说明<br />
+umount<br />
+命令是mount命令的逆操作，它的参数和使用方法和mount命令是一样的。Linux挂装CD-ROM后，会锁定CD—ROM，这样就不能用CD-<br />
+ROM面板上的Eject按钮弹出它。但是，当不再需要光盘时，如果已将/cdrom作为符号链接，请使用umount/cdrom来卸装它。仅当无用户<br />
+正在使用光盘时，该命令才会成功。该命令包括了将带有当前工作目录当作该光盘中的目录的终端窗口。<br /><br /><strong>exit</strong><br />
+1.作用<br />
+exit命令的作用是退出系统，它的使用权限是所有用户。<br />
+2.格式<br />
+exit<br />
+3.参数<br />
+exit命令没有参数，运行后退出系统进入登录界面</p>
+
+<p><strong>二、文件处理命令<br />
+mkdir</strong><br />
+1.作用<br />
+mkdir命令的作用是建立名称为dirname的子目录，与MS DOS下的md命令类似，它的使用权限是所有用户。<br />
+2.格式<br />
+mkdir [options] 目录名<br />
+3.[options]主要参数<br />
+－m, －－mode=模式：设定权限，与chmod类似。<br />
+－p, －－parents：需要时创建上层目录；如果目录早已存在，则不当作错误。<br />
+－v, －－verbose：每次创建新目录都显示信息。<br />
+－－version：显示版本信息后离开。<br />
+4.应用实例<br />
+在进行目录创建时可以设置目录的权限，此时使用的参数是“－m”。假设要创建的目录名是“tsk”，让所有用户都有rwx(即读、写、执行的权限)，那么可以使用以下命令：<br />
+$ mkdir －m777 tsk<br /><strong>grep</strong><br />
+1.作用<br />
+grep命令可以指定文件中搜索特定的内容，并将含有这些内容的行标准输出。grep全称是Global Regular ExpressionPrint，表示全局正则表达式版本，它的使用权限是所有用户。<br />
+2.格式<br />
+grep [options]<br />
+3.主要参数<br />
+[options]主要参数：<br />
+－c：只输出匹配行的计数。<br />
+－I：不区分大小写（只适用于单字符）。<br />
+－h：查询多文件时不显示文件名。<br />
+－l：查询多文件时只输出包含匹配字符的文件名。<br />
+－n：显示匹配行及行号。<br />
+－s：不显示不存在或无匹配文本的错误信息。<br />
+－v：显示不包含匹配文本的所有行。<br />
+pattern正则表达式主要参数：<br />
+\：忽略正则表达式中特殊字符的原有含义。<br />
+^：匹配正则表达式的开始行。<br />
+$: 匹配正则表达式的结束行。<br />
+\：到匹配正则表达式的行结束。<br />
+[ ]：单个字符，如[A]即A符合要求 。<br />
+[ - ]：范围，如[A-Z]，即A、B、C一直到Z都符合要求 。<br />
+。：所有的单个字符。<br />
+* ：有字符，长度可以为0。<br />
+正则表达式是Linux/Unix系统中非常重要的概念。正则表达式（也称为“regex”或“regexp”）是一个可以描述一类字符串的模式（Pattern）。如果一个字符串可以用某个正则表达式来描述，我们就说这个字符和该正则表达式匹配（Match）。这和DOS中用户可以使用通配符<br />
+“*”代表任意字符类似。在Linux系统上，正则表达式通常被用来查找文本的模式，以及对文本执行“搜索－替换”操作和其它功能。<br />
+4.应用实例<br />
+查询DNS服务是日常工作之一，这意味着要维护覆盖不同网络的大量IP地址。有时IP地址会超过2000个。如果要查看nnn.nnn网络地址，但是却忘了第二部分中的其余部分，只知到有两个句点，例如nnn nn..。要抽取其中所有nnn.nnn IP地址，使用[0－9 ]\{3<br />
+\}\.[0－0\{3\}\。含义是任意数字出现3次，后跟句点，接着是任意数字出现3次，后跟句点。<br />
+$grep ’[0－9]\{3 \}\.[0－0\{3\}\’ipfile<br />
+补充说明，grep家族还包括fgrep和egrep。fgrep是fix grep，允许查找字符串而不是一个模式；egrep是扩展grep，支持基本及扩展的正则表达式，但不支持\q模式范围的应用及与之相对应的一些更加规范的模式。<br /><strong>dd</strong><br />
+1.作用<br />
+dd命令用来复制文件，并根据参数将数据转换和格式化。<br />
+2.格式<br />
+dd [options]<br />
+3.[opitions]主要参数<br />
+bs=字节：强迫 ibs=及obs=。<br />
+cbs=字节：每次转换指定的。<br />
+conv=关键字：根据以逗号分隔的关键字表示的方式来转换文件。<br />
+count=块数目：只复制指定的输入数据。<br />
+ibs=字节：每次读取指定的。<br />
+if=文件：读取内容，而非标准输入的数据。<br />
+obs=字节：每次写入指定的。<br />
+of=文件：将数据写入，而不在标准输出显示。<br />
+seek=块数目：先略过以obs为单位的指定的输出数据。<br />
+skip=块数目：先略过以ibs为单位的指定的输入数据。<br />
+4.应用实例<br />
+dd命令常常用来制作Linux启动盘。先找一个可引导内核，令它的根设备指向正确的根分区，然后使用dd命令将其写入软盘：<br />
+$ rdev vmlinuz /dev/hda<br />
+$dd if＝vmlinuzof＝/dev/fd0<br />
+上面代码说明，使用rdev命令将可引导内核vmlinuz中的根设备指向/dev/hda，请把“hda”换成自己的根分区，接下来用dd命令将该内核写入软盘。<br /><strong>find</strong><br />
+1.作用<br />
+find命令的作用是在目录中搜索文件，它的使用权限是所有用户。<br />
+2.格式<br />
+find [path][options][expression]<br />
+path指定目录路径，系统从这里开始沿着目录树向下查找文件。它是一个路径列表，相互用空格分离，如果不写path，那么默认为当前目录。<br />
+3.主要参数<br />
+[options]参数：<br />
+－depth：使用深度级别的查找过程方式，在某层指定目录中优先查找文件内容。<br />
+－maxdepth levels：表示至多查找到开始目录的第level层子目录。level是一个非负数，如果level是0的话表示仅在当前目录中查找。<br />
+－mindepth levels：表示至少查找到开始目录的第level层子目录。<br />
+－mount：不在其它文件系统（如Msdos、Vfat等）的目录和文件中查找。<br />
+－version：打印版本。<br />
+[expression]是匹配表达式，是find命令接受的表达式，find命令的所有操作都是针对表达式的。它的参数非常多，这里只介绍一些常用的参数。<br />
+—name：支持统配符*和?。<br />
+－atime n：搜索在过去n天读取过的文件。<br />
+－ctime n：搜索在过去n天修改过的文件。<br />
+－group grpoupname：搜索所有组为grpoupname的文件。<br />
+－user 用户名：搜索所有文件属主为用户名（ID或名称）的文件。<br />
+－size n：搜索文件大小是n个block的文件。<br />
+－print：输出搜索结果，并且打印。<br />
+4.应用技巧<br />
+find命令查找文件的几种方法：<br />
+（1）根据文件名查找<br />
+例如，我们想要查找一个文件名是lilo.conf的文件，可以使用如下命令：<br />
+find / －namelilo.conf<br />
+find命令后的“/”表示搜索整个硬盘。<br />
+（2）快速查找文件<br />
+根据文件名查找文件会遇到一个实际问题，就是要花费相当长的一段时间，特别是大型Linux文件系统和大容量硬盘文件放在很深的子目录中时。如果我们知道了这个文件存放在某个目录中，那么只要在这个目录中往下寻找就能节省很多时间。比如smb.conf文件，从它的文件后缀“.conf”可以判断这是一个配置文件，那么它应该在/etc目录内，此时可以使用下面命令：<br />
+find /etc －namesmb.conf<br />
+这样，使用“快速查找文件”方式可以缩短时间。<br />
+（3）根据部分文件名查找方法<br />
+有时我们知道只某个文件包含有abvd这4个字，那么要查找系统中所有包含有这4个字符的文件可以输入下面命令：<br />
+find / －name’*abvd*’<br />
+输入这个命令以后，Linux系统会将在/目录中查找所有的包含有abvd这4个字符的文件（其中*是通配符），比如abvdrmyz等符合条件的文件都能显示出来。<br />
+(4) 使用混合查找方式查找文件<br />
+find命令可以使用混合查找的方法，例如，我们想在/etc目录中查找大于500000字节，并且在24小时内修改的某个文件，则可以使用-and (与)把两个查找参数链接起来组合成一个混合的查找方式。<br />
+find /etc -size +500000c -and -mtime +1<br /><strong>mv</strong><br />
+1.作用<br />
+mv命令用来为文件或目录改名，或者将文件由一个目录移入另一个目录中，它的使用权限是所有用户。该命令如同DOS命令中的ren和move的组合。<br />
+2.格式<br />
+mv[options] 源文件或目录 目标文件或目录<br />
+3.[options]主要参数<br />
+－i：交互方式操作。如果mv操作将导致对已存在的目标文件的覆盖，此时系统询问是否重写，要求用户回答“y”或“n”，这样可以避免误覆盖文件。<br />
+－f：禁止交互操作。mv操作要覆盖某个已有的目标文件时不给任何指示，指定此参数后i参数将不再起作用。<br />
+4.应用实例<br />
+（1）将/usr/cbu中的所有文件移到当前目录（用“.”表示）中：<br />
+$ mv /usr/cbu/ * .<br />
+（2）将文件cjh.txt重命名为wjz.txt：<br />
+$ mv cjh.txt wjz.txt　<br /><strong>ls</strong><br />
+1.作用<br />
+ls命令用于显示目录内容，类似DOS下的dir命令，它的使用权限是所有用户。<br />
+2.格式<br />
+ls [options][filename]<br />
+3.options主要参数<br />
+－a, －－all：不隐藏任何以“.” 字符开始的项目。<br />
+－A, －－almost－all：列出除了“ . ”及 “.. ”以外的任何项目。<br />
+－－author：印出每个文件著作者。<br />
+－b, －－escape：以八进制溢出序列表示不可打印的字符。<br />
+－－block－size=大小：块以指定的字节为单位。<br />
+－B, －－ignore－backups：不列出任何以 ~ 字符结束的项目。<br />
+－f：不进行排序，－aU参数生效，－lst参数失效。<br />
+－F, －－classify：加上文件类型的指示符号 (*/=@| 其中一个)。<br />
+－g：like －l, but do not listowner。<br />
+－G, －－no－group：inhibit display ofgroup information。<br />
+－i, －－inode：列出每个文件的inode号。<br />
+－I, －－ignore=样式：不印出任何符合Shell万用字符的项目。<br />
+－k：即－－block－size=1K。<br />
+－l：使用较长格式列出信息。<br />
+－L, －－dereference：当显示符号链接的文件信息时，显示符号链接所指示的对象，而并非符号链接本身的信息。<br />
+－m：所有项目以逗号分隔，并填满整行行宽。<br />
+－n, －－numeric－uid－gid：类似－l，但列出UID及GID号。<br />
+－N, －－literal：列出未经处理的项目名称，例如不特别处理控制字符。<br />
+－p, －－file－type：加上文件类型的指示符号 (/=@| 其中一个)。<br />
+－Q, －－quote－name：将项目名称括上双引号。<br />
+－r, －－reverse：依相反次序排列。<br />
+－R, －－recursive：同时列出所有子目录层。<br />
+－s, －－size：以块大小为序。<br />
+4.应用举例<br />
+ls<br />
+命令是Linux系统使用频率最多的命令，它的参数也是Linux命令中最多的。使用ls命令时会有几种不同的颜色，其中蓝色表示是目录，绿色表示是可执<br />
+行文件，红色表示是压缩文件，浅蓝色表示是链接文件，加粗的黑色表示符号链接，灰色表示是其它格式文件。ls最常使用的是ls- l。<br />
+文<br />
+件类型开头是由10个字符构成的字符串。其中第一个字符表示文件类型，它可以是下述类型之一：－（普通文件）、d（目录）、l（符号链接）、b（块设备文件）、c（字符设备文件）。后面的9个字符表示文件的访问权限，分为3组，每组3位。第一组表示文件属主的权限，第二组表示同组用户的权限，第三组表示其他用户的权限。每一组的三个字符分别表示对文件的读（r）、写（w）和执行权限（x）。对于目录，表示进入权限。s表示当文件被执行时，把该文件的UID或GID赋予执行进程的UID（用户ID）或GID（组ID）。t表示设置标志位（留在内存，不被换出）。如果该文件是目录，那么在该目录中的文件只能被超级用户、目录拥有者或文件属主删除。如果它是可执行文件，那么在该文件执行后，指向其正文段的指针仍留在内存。这样再次执行它时，系统就能更快地装入该文件。接着显示的是文件大小、生成时间、文件或命令名称。</p>
+
+<p><br /><strong>diff</strong><br />
+1.作用<br />
+diff命令用于两个文件之间的比较，并指出两者的不同，它的使用权限是所有用户。<br />
+2.格式<br />
+diff [options] 源文件 目标文件<br />
+3.[options]主要参数<br />
+-a：将所有文件当作文本文件来处理。<br />
+-b：忽略空格造成的不同。<br />
+-B：忽略空行造成的不同。<br />
+-c：使用纲要输出格式。<br />
+-H：利用试探法加速对大文件的搜索。<br />
+-I：忽略大小写的变化。<br />
+-n --rcs：输出RCS格式。<br /><strong>cmp</strong><br />
+1.作用<br />
+cmp（“compare”的缩写）命令用来简要指出两个文件是否存在差异，它的使用权限是所有用户。<br />
+2.格式<br />
+cmp[options] 文件名<br />
+3.[options]主要参数<br />
+-l: 将字节以十进制的方式输出，并方便将两个文件中不同的以八进制的方式输出。<br />
+cat<br />
+1.作用<br />
+cat（“concatenate”的缩写）命令用于连接并显示指定的一个和多个文件的有关信息，它的使用权限是所有用户。<br />
+2.格式<br />
+cat [options] 文件1 文件2……<br />
+3.[options]主要参数<br />
+－n：由第一行开始对所有输出的行数编号。<br />
+－b：和－n相似，只不过对于空白行不编号。<br />
+－s：当遇到有连续两行以上的空白行时，就代换为一行的空白行。<br />
+4.应用举例<br />
+（1）cat命令一个最简单的用处是显示文本文件的内容。例如，我们想在命令行看一下README文件的内容，可以使用命令：<br />
+$ cat README　<br />
+（2）有时需要将几个文件处理成一个文件，并将这种处理的结果保存到一个单独的输出文件。cat命令在其输入上接受一个或多个文件，并将它们作为一个单独的文件打印到它的输出。例如，把README和INSTALL的文件内容加上行号（空白行不加）之后，将内容附加到一个新文本文件File1 中：<br />
+$ cat README INSTALL File1<br />
+（3）cat还有一个重要的功能就是可以对行进行编号。这种功能对于程序文档的编制，以及法律和科学文档的编制很方便，打印在左边的行号使得参考文档的某一部分变得容易，这些在编程、科学研究、业务报告甚至是立法工作中都是非常重要的。对行进行编号功能有-b（只能对非空白行进行编号）和-n（可以对所有行进行编号）两个参数：<br />
+$ cat -b /etc/named.conf<br /><strong>ln</strong><br />
+1.作用<br />
+ln命令用来在文件之间创建链接，它的使用权限是所有用户。<br />
+2.格式<br />
+ln [options] 源文件 [链接名]<br />
+3.参数<br />
+－f：链结时先将源文件删除。<br />
+－d：允许系统管理者硬链结自己的目录。<br />
+－s：进行软链结(Symbolic Link)。<br />
+－b：将在链结时会被覆盖或删除的文件进行备份。<br />
+链接有两种，一种被称为硬链接（Hard Link），另一种被称为符号链接（Symbolic Link）。默认情况下，ln命令产生硬链接。硬连接指通过索引节点来进行的连接。在Linux的文件系统中，保存在磁盘分区中的文件不管是什么类型都给它分配一个编号，称为索引节点号(InodeIndex)。在Linux中，多个文件名指向同一索引节点是存在的。一般这种连接就是硬连接。硬连接的作用是允许一个文件拥有多个有效路径名，这样用户就可以建立硬连接到重要文件，以防止“误删”的功能。其原因如上所述，因为对应该目录的索引节点有一个以上的连接。只删除一个连接并不影响索引节点本身和其它的连接，只有当最后一个连接被删除后，文件的数据块及目录的连接才会被释放。也就是说，文件才会被真正删除。与硬连接相对应，Lnux系统中还存在另一种连接，称为符号连接（Symbilc Link），也叫软连接。软链接文件有点类似于Windows的快捷方式。它实际上是特殊文件的一种。在符号连接中，文件实际上是一个文本文件，其中包含的有另一文件的位置信息</p>
+
+<p><strong>三、系统管理命令<br />
+df</strong><br />
+1.作用<br />
+df命令用来检查文件系统的磁盘空间占用情况，使用权限是所有用户。<br />
+2.格式<br />
+df [options]<br />
+3.主要参数<br />
+－s：对每个Names参数只给出占用的数据块总数。<br />
+－a：递归地显示指定目录中各文件及子目录中各文件占用的数据块数。若既不指定－s，也不指定－a，则只显示Names中的每一个目录及其中的各子目录所占的磁盘块数。<br />
+－k：以1024字节为单位列出磁盘空间使用情况。<br />
+－x：跳过在不同文件系统上的目录不予统计。<br />
+－l：计算所有的文件大小，对硬链接文件则计算多次。<br />
+－i：显示inode信息而非块使用量。<br />
+－h：以容易理解的格式印出文件系统大小，例如136KB、254MB、21GB。<br />
+－P：使用POSIX输出格式。<br />
+－T：显示文件系统类型。<br />
+4.说明<br />
+df命令被广泛地用来生成文件系统的使用统计数据，它能显示系统中所有的文件系统的信息，包括总容量、可用的空闲空间、目前的安装点等。超级权限用户使用df命令时会发现这样的情况：某个分区的容量超过了100％。这是因为Linux系统为超级用户保留了10％的空间，由其单独支配。也就是说，对于超级用户而言，他所见到的硬盘容量将是110％。这样的安排对于系统管理而言是有好处的，当硬盘被使用的容量接近100％时系统管理员还可以正常工作。<br />
+5.应用实例<br />
+Linux支持的文件系统非常多，包括JFS、ReiserFS、ext、ext2、ext3、ISO9660、XFS、Minx、vfat、MSDOS等。使用df -T命令查看磁盘空间时还可以得到文件系统的信息：<br />
+＃df －T<br />
+文件系统 类型 容量 已用 可用 已用% 挂载点<br />
+/dev/hda7 reiserfs 5.2G 1.6G 3.7G 30% /<br />
+/dev/hda1 vfat 2.4G 1.6G 827M 66% /windows/C<br />
+/dev/hda5 vfat 3.0G 1.7G 1.3G 57% /windows/D<br />
+/dev/hda9 vfat 3.0G 2.4G 566M 82% /windows/E<br />
+/dev/hda10 NTFS 3.2G 573M 2.6G 18% /windows/F<br />
+/dev/hda11 vfat 1.6G 1.5G 23M 99% /windows/G<br />
+从上面除了可以看到磁盘空间的容量、使用情况外，分区的文件系统类型、挂载点等信息也一览无遗。<br /><strong>top</strong><br />
+1.作用<br />
+top命令用来显示执行中的程序进程，使用权限是所有用户。<br />
+2.格式<br />
+top [－] [d delay] [q] [c] [S] [n]<br />
+3.主要参数<br />
+d：指定更新的间隔，以秒计算。<br />
+q：没有任何延迟的更新。如果使用者有超级用户，则top命令将会以最高的优先序执行。<br />
+c：显示进程完整的路径与名称。<br />
+S：累积模式，会将己完成或消失的子行程的CPU时间累积起来。<br />
+s：安全模式。<br />
+i：不显示任何闲置(Idle)或无用(Zombie)的行程。<br />
+n：显示更新的次数，完成后将会退出top。<br />
+4.说明<br />
+top命令是Linux系统管理的一个主要命令，通过它可以获得许多信息。<br />
+下面列出了详细解释。<br />
+PID（Process ID）：进程标示号。<br />
+USER：进程所有者的用户名。<br />
+PR：进程的优先级别。<br />
+NI：进程的优先级别数值。<br />
+VIRT：进程占用的虚拟内存值。<br />
+RES：进程占用的物理内存值。<br />
+SHR：进程使用的共享内存值。<br />
+S：进程的状态，其中S表示休眠，R表示正在运行，Z表示僵死状态，N表示该进程优先值是负数。<br />
+%CPU：该进程占用的CPU使用率。<br />
+%MEM：该进程占用的物理内存和总内存的百分比。<br />
+TIME＋：该进程启动后占用的总的CPU时间。<br />
+Command：进程启动的启动命令名称，如果这一行显示不下，进程会有一个完整的命令行。<br />
+top命令使用过程中，还可以使用一些交互的命令来完成其它参数的功能。这些命令是通过快捷键启动的。<br />
+：立刻刷新。<br />
+P：根据CPU使用大小进行排序。<br />
+T：根据时间、累计时间排序。<br />
+q：退出top命令。<br />
+m：切换显示内存信息。<br />
+t：切换显示进程和CPU状态信息。<br />
+c：切换显示命令名称和完整命令行。<br />
+M：根据使用内存大小进行排序。<br />
+W：将当前设置写入~/.toprc文件中。这是写top配置文件的推荐方法。<br />
+可以看到，top命令是一个功能十分强大的监控系统的工具，对于系统管理员而言尤其重要。但是，它的缺点是会消耗很多系统资源。<br /><strong>free</strong><br />
+1.作用<br />
+free命令用来显示内存的使用情况，使用权限是所有用户。<br />
+2.格式<br />
+free [－b|－k|－m] [－o] [－s delay] [－t] [－V]<br />
+3.主要参数<br />
+－b －k －m：分别以字节（KB、MB）为单位显示内存使用情况。<br />
+－s delay：显示每隔多少秒数来显示一次内存使用情况。<br />
+－t：显示内存总和列。<br />
+－o：不显示缓冲区调节列。<br />
+4.应用实例<br />
+free命令是用来查看内存使用情况的主要命令。和top命令相比，它的优点是使用简单，并且只占用很少的系统资源。通过－S参数可以使用free命令不间断地监视有多少内存在使用，这样可以把它当作一个方便实时监控器。<br />
+＃free －b －s5<br />
+使用这个命令后终端会连续不断地报告内存使用情况（以字节为单位），每5秒更新一次。<br /><br /><strong>kill</strong><br />
+1.作用<br />
+kill命令用来中止一个进程。<br />
+2.格式<br />
+kill [ －s signal | －p ] [ －a ] pid ...<br />
+kill －l [ signal ]<br />
+3.参数<br />
+－s：指定发送的信号。<br />
+－p：模拟发送信号。<br />
+－l：指定信号的名称列表。<br />
+pid：要中止进程的ID号。<br />
+Signal：表示信号。<br />
+4.说明<br />
+进程是Linux系统中一个非常重要的概念。Linux是一个多任务的操作系统，系统上经常同时运行着多个进程。我们不关心这些进程究竟是如何分配的，或者是内核如何管理分配时间片的，所关心的是如何去控制这些进程，让它们能够很好地为用户服务。<br />
+Linux<br />
+操作系统包括三种不同类型的进程，每种进程都有自己的特点和属性。交互进程是由一个Shell启动的进程。交互进程既可以在前台运行，也可以在后台运行。<br />
+批处理进程和终端没有联系，是一个进程序列。监控进程（也称系统守护进程）时Linux系统启动时启动的进程，并在后台运行。例如，httpd是著名的<br />
+Apache服务器的监控进程。<br />
+kill命令的工作原理是，向Linux系统的内核发送一个系统操作信号<br />
+和某个程序的进程标识号，然后系统内核就可以对进程标识号指定的进程进行操作。比如在top命令中，我们看到系统运行许多进程，有时就需要使用kill中<br />
+止某些进程来提高系统资源。在讲解安装和登陆命令时，曾提到系统多个虚拟控制台的作用是当一个程序出错造成系统死锁时，可以切换到其它虚拟控制台工作关闭<br />
+这个程序。此时使用的命令就是kill，因为kill是大多数Shell内部命令可以直接调用的。<br />
+5.应用实例<br />
+（1）强行中止（经常使用杀掉）一个进程标识号为324的进程：<br />
+＃kill －9 324<br />
+（2）解除Linux系统的死锁<br />
+在Linux<br />
+中有时会发生这样一种情况：一个程序崩溃，并且处于死锁的状态。此时一般不用重新启动计算机，只需要中止(或者说是关闭)这个有问题的程序即可。当<br />
+kill处于X-Window界面时，主要的程序(除了崩溃的程序之外)一般都已经正常启动了。此时打开一个终端，在那里中止有问题的程序。比如，如果<br />
+Mozilla浏览器程序出现了锁死的情况，可以使用kill命令来中止所有包含有Mozolla浏览器的程序。首先用top命令查处该程序的PID，然<br />
+后使用kill命令停止这个程序：<br />
+＃kill －SIGKILL XXX<br />
+其中，XXX是包含有Mozolla浏览器的程序的进程标识号。<br />
+（3）使用命令回收内存<br />
+我们知道内存对于系统是非常重要的，回收内存可以提高系统资源。kill命令可以及时地中止一些“越轨”的程序或很长时间没有相应的程序。例如，使用top命令发现一个无用 (Zombie) 的进程，此时可以使用下面命令：<br />
+＃kill －9 XXX<br />
+其中，XXX是无用的进程标识号。<br />
+然后使用下面命令：<br />
+＃free<br />
+此时会发现可用内存容量增加了。<br />
+（4）killall命令<br />
+Linux下还提供了一个killall命令，可以直接使用进程的名字而不是进程标识号，例如：<br />
+＃ killall -HUP inetd</p>
+
+<p> </p>
+
+<p>鸣谢:本文部分内容来自下面的链接,感谢相关作者的贡献.如侵权或需要删除请联系我.</p>
+
+<p><a href="https://baike.baidu.com/item/busybox/427860?fr=aladdin" rel="nofollow">https://baike.baidu.com/item/busybox/427860?fr=aladdin</a></p>
+
+<p><a href="https://blog.csdn.net/rfidunion/article/details/54694516">https://blog.csdn.net/rfidunion/article/details/54694516</a></p>
+
+<p><a href="https://www.jianshu.com/p/c0d8107f161e" rel="nofollow">https://www.jianshu.com/p/c0d8107f161e</a></p>
+
+<p><a href="https://blog.csdn.net/tinylab/article/details/45230165">https://blog.csdn.net/tinylab/article/details/45230165</a></p>
+
+<p><a href="https://blog.csdn.net/love_gaohz/article/details/41041781">https://blog.csdn.net/love_gaohz/article/details/41041781</a></p>
+
+<p><a href="http://www.ztphone.com/thread-2947-1-1.html" rel="nofollow">http://www.ztphone.com/thread-2947-1-1.html</a></p>
+                                    </div>
+                                </div>

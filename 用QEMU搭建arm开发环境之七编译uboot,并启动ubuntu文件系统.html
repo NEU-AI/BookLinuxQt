@@ -1,0 +1,213 @@
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>1.下载并编译uboot</h1>
+
+<p>官方下载地址:<a href="ftp://ftp.denx.de/pub/u-boot/" rel="nofollow">ftp://ftp.denx.de/pub/u-boot/</a></p>
+
+<p>如果下载比较慢可以从这里下:</p>
+
+<blockquote>
+<p>链接：https://pan.baidu.com/s/1WPdpB6L-p9ha3-8AuZKM4g <br />
+提取码：04vi</p>
+</blockquote>
+
+<p>我们选择的是这个版本:u-boot-2017.01.tar.bz2</p>
+
+<p>首先解压缩上面的代码,然后配置qemu支持的版本,然后编译</p>
+
+<pre>
+<code class="language-bash">tar jxvf u-boot-2017.01.tar.bz2
+cd u-boot-2017.01
+make vexpress_ca9x4_defconfig ARCH=arm
+ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make all -j16</code></pre>
+
+<p>编译成功后,产生三个文件</p>
+
+<p>- "u-boot.bin" is a raw binary image<br />
+- "u-boot" is an image in ELF binary format<br />
+- "u-boot.srec" is in Motorola S-Record format</p>
+
+<p>我们测试一下这个u-boot是否能正常启动:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel u-boot -nographic</p>
+</blockquote>
+
+<p>如果启动正常,显示类似如下:</p>
+
+<pre>
+<code>$ qemu-system-arm -M vexpress-a9 -m 512M -kernel u-boot -nographic
+pulseaudio: set_sink_input_volume() failed
+pulseaudio: Reason: Invalid argument
+pulseaudio: set_sink_input_mute() failed
+pulseaudio: Reason: Invalid argument
+
+
+U-Boot 2017.01 (Jul 11 2020 - 00:35:07 +0800)
+
+DRAM:  512 MiB
+WARNING: Caches not enabled
+Flash: 128 MiB
+MMC:   MMC: 0
+*** Warning - bad CRC, using default environment
+
+In:    serial
+Out:   serial
+Err:   serial
+Net:   smc911x-0
+Hit any key to stop autoboot:  0 
+=&gt; 
+=&gt; 
+</code></pre>
+
+<p>按Ctrl+A+X可以退出QEMU.</p>
+
+<h1><br />
+2.制作uboot启动文件</h1>
+
+<p>首先需要安装:sudo apt install u-boot-tools</p>
+
+<p>因为uboot所需的启动文件不同于我们默认的启动文件(要在文件前面加上头部),所以需要把之前做好的文件做改造.</p>
+
+<blockquote>
+<p>mkimage -n 'linux' -A arm -O linux -T kernel -C none -a 0x60008000 -e 0x60008000 -d Image uImage</p>
+
+<p>mkimage -A arm -O linux -T ramdisk -C gzip -n "ARM32 Linux Rootfs" -d ramdisk.gz ramdisk.gz.uboot</p>
+</blockquote>
+
+<p>这样uboot所需的文件就做好了,然后我们启动qemu</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel u-boot -nographic -sd boot.vfat</p>
+</blockquote>
+
+<p>当uboot启动起来后,按回车停止uboot,然后输入如下命令:</p>
+
+<blockquote>
+<p>fatload mmc 0:0 60008000 zimage;fatload mmc 0:0 61008000 vexpress-v2p-ca9.dtb;fatload mmc 0:0 62008000 ramdisk.gz.uboot;bootz 60008000 62008000 61008000</p>
+</blockquote>
+
+<p>注:如果想要启动刚才制作的uImage也是可以的,把上面的zImage换成uImage,bootz换成bootm.(uImage就是没有压缩的zImage,然后用uboot工具加了一个头)</p>
+
+<p>启动后会显示下面的内容:</p>
+
+<pre>
+<code>mount root file system successfully...
+enter new root...
+switch_root: can't open '/dev/console': No such file or directory
+Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
+
+CPU: 0 PID: 1 Comm: busybox Not tainted 4.4.229+ #7
+Hardware name: ARM-Versatile Express
+[&lt;800155e8&gt;] (unwind_backtrace) from [&lt;80011ffc&gt;] (show_stack+0x10/0x14)
+[&lt;80011ffc&gt;] (show_stack) from [&lt;80247198&gt;] (dump_stack+0x84/0xa4)
+[&lt;80247198&gt;] (dump_stack) from [&lt;800a3428&gt;] (panic+0x8c/0x1f4)
+[&lt;800a3428&gt;] (panic) from [&lt;8002645c&gt;] (do_exit+0xa20/0xa4c)
+[&lt;8002645c&gt;] (do_exit) from [&lt;80026554&gt;] (do_group_exit+0x3c/0xd0)
+[&lt;80026554&gt;] (do_group_exit) from [&lt;800265f8&gt;] (__wake_up_parent+0x0/0x18)
+---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100</code></pre>
+
+<p>上面日志说明uboot启动内核和ramdisk已经成功了,但是跳转到文件系统的时候失败了.</p>
+
+<h1>3.制作ubuntu文件系统</h1>
+
+<p>因为ubuntu文件系统启动文件位置不同,所以首先修改ramdisk里面的init脚本中的下面这句话:</p>
+
+<pre>
+<code>exec $BUSYBOX switch_root -c /dev/console /newroot /sbin/init</code></pre>
+
+<p>然后我们使用下面的命令重新制作uboot所需的ramdisk镜像</p>
+
+<blockquote>
+<p>mkimage -A arm -O linux -T ramdisk -C gzip -n "ARM32 Linux Rootfs" -d ramdisk.gz ramdisk.gz.uboot</p>
+</blockquote>
+
+<p>从这里下载一个ubuntu的基本文件系统:</p>
+
+<blockquote>
+<p>链接：https://pan.baidu.com/s/19j9Xxt_ZmqldzBNFrZIJ_A <br />
+提取码：294w</p>
+</blockquote>
+
+<p>然后我们开始制作ubuntu的文件系统</p>
+
+<pre>
+<code>dd if=/dev/zero of=rootfsubuntu.ext3 bs=1M count=1000
+
+mkfs.ext3 rootfsubuntu.ext3
+
+sudo mount rootfsubuntu.ext3 mnt
+
+cd mnt
+
+tar xvf /mnt/hgfs/vm_share/ubuntu-18.04.1-minimal-armhf-2018-11-26.tar.xz
+
+mv ubuntu-18.04.1-minimal-armhf-2018-11-26/* .
+
+rm -rf image-builder.project lost+found ubuntu-18.04.1-minimal-armhf-2018-11-26 user_password.list
+
+sudo tar xvfp ../armhf-rootfs-ubuntu-bionic.tar -C .
+
+sudo rm ../armhf-rootfs-ubuntu-bionic.tar
+
+cd boot
+
+sudo cp ../../zImage .
+
+sudo cp ../../vexpress-v2p-ca9.dtb .
+
+sudo cp ../../ramdisk.gz.uboot .
+
+cd ../..
+
+sudo umount mnt</code></pre>
+
+<p>这样文件系统就做好了,然后我们启动qemu:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel u-boot -nographic -sd rootfsubuntu.ext3</p>
+</blockquote>
+
+<p>启动成功后,按回车停下来,输入下面的命令:</p>
+
+<blockquote>
+<p>ext4load mmc 0:0 60008000 boot/zImage;ext4load mmc 0:0 61008000 boot/vexpress-v2p-ca9.dtb;ext4load mmc 0:0 62008000 boot/ramdisk.gz.uboot;bootz 60008000 62008000 61008000<br />
+ </p>
+</blockquote>
+
+<p>如果Ubuntu启动成功,会出现类似下面的内容:</p>
+
+<blockquote>
+<p>[  OK  ] Started Connection service.<br />
+[  OK  ] Reached target Network.<br />
+         Starting Permit User Sessions...<br />
+         Starting A high performance web server and a reverse proxy server...<br />
+[  OK  ] Started Permit User Sessions.<br />
+         Starting Set console scheme...<br />
+[  OK  ] Started Serial Getty on ttyAMA0.</p>
+
+<p>Ubuntu 18.04.1 LTS arm ttyAMA0</p>
+
+<p>default username:password is [ubuntu:temppwd]</p>
+</blockquote>
+
+<p>输入用户名:ubuntu,密码:temppwd就可以进入ubuntu了.</p>
+
+<p> </p>
+
+<p><strong>鸣谢:</strong>本文部分内容来自下面的链接,感谢相关作者的贡献.如侵权或需要删除请联系我.</p>
+
+<p><a href="https://blog.csdn.net/rfidunion/article/details/54670625">https://blog.csdn.net/rfidunion/article/details/54670625</a></p>
+
+<p><a href="https://blog.csdn.net/qq_24188351/article/details/77891353">https://blog.csdn.net/qq_24188351/article/details/77891353</a></p>
+
+<p><a href="https://blog.csdn.net/rfidunion/article/details/55254424?utm_source=blogxgwz1">https://blog.csdn.net/rfidunion/article/details/55254424?utm_source=blogxgwz1</a></p>
+
+<p><a href="https://www.cnblogs.com/AMDDMA/articles/10815053.html" rel="nofollow">https://www.cnblogs.com/AMDDMA/articles/10815053.html</a></p>
+
+<p> </p>
+
+<p> </p>
+                                    </div>
+                                </div>

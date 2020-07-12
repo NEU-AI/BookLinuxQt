@@ -1,0 +1,183 @@
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>1.RAMDISK简介</h1>
+
+<p><strong>1.1   什么是Ram Disk</strong><br />
+Ram Disk 就是将内存中的一块区域作为物理磁盘来使用的一种技术。<br />
+对于用户来说，可以把RAM disk与通常的硬盘分区（如/dev/hda1）同等对待来使用。<br /><strong>1.2    Ramdisk与硬盘分区的不同</strong><br />
+RAM disk不适合作为长期保存文件的介质，掉电后Ramdisk的内容会随内存内容的消失而消失。<br />
+RAM disk的其中一个优势是它的读写速度高，内存盘的存取速度要远快于目前的物理硬盘，可以被用作需要高速读写的文件。<br />
+注意：在2.6版本后，Ramdisk的这一作用开始被tmpfs(Virtual memory file system support)取代。   <br /><strong>1.3    系统启动中Ramdisk的作用</strong><br />
+系统盘中通常有一些文件是希望被保护起来的,不希望被用户修改,所以这些文件最好是保存在一种只读分区上。ramdisk通常被制作成一个镜像,在uboot启动的时候,加载到内存中而不是直接使用这个镜像.这样无论用户怎么修改这个内存中的文件,再次启动的时候又会恢复到最初的状态.<br /><strong>1.4    日常使用中Ramdisk的作用</strong><br />
+内存盘对于保存加密数据来说是一个福音，因为我们如果将加密的文件解密到普通磁盘的话，即使我们随后删除了解密文件，数据仍然会留在磁盘上。这样是非常不安全的。而对于 RamDisk 来说，没有这样的问题。假设有几个文件要频繁的使用，你如果将它们加到内存当中，程序运行速度会大副提高，因为内存的读写速度远高于硬盘。</p>
+
+<h1><br />
+2.用BusyBox建立RAMDISK</h1>
+
+<p>对Busybox而言无论是是制作成上一章所需的文件系统还是本章所需的ramdisk,所需的文件大体上是一样的(这样说的原因是通常ramdisk不是启动的终点,ramdisk启动成功后还需要跳转到磁盘或者其他存储介质上的下一级系统的启动文件).</p>
+
+<p>所以我们直接使用刚才做好的文件系统image文件来制作ramdisk(当然你也可以用busybox的编译结果制作ramdisk).</p>
+
+<pre>
+<code>sudo mount rootfs.ext3 mnt
+cd mnt
+find . | cpio -o -H newc | gzip -9 &gt; ../ramdisk.gz
+cd ..
+sudo umount mnt</code></pre>
+
+<p>ramdisk.gz就是做好的ramdisk文件.我们用下面的命令来启动:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -initrd ramdisk.gz -append "root=/dev/ram0 clocksource=pit rw console=tty0 rdinit=/linuxrc"</p>
+</blockquote>
+
+<p>上面命令中rdinit是指定ramdisk的启动文件,我们现在是选择/linuxrc,参数root=/dev/ram0是选择ramdisk作为root节点.console=tty0是选择控制台为串口0,我们的内核编译选择了CONFIG_FRAMEBUFFER_CONSOLE=y,所以可以在屏幕上直接显示控制台并操作.</p>
+
+<h1><br />
+3.QEMU启动内核加RAMDISK加挂载文件系统</h1>
+
+<p>到这里我们虽然可以启动ramdisk了但是我们没有跳转到文件系统,所以我们需要修改上面的ramdisk来跳转到其他存储介质的文件系统(我们暂时还是以我们刚才制作的buzybox的文件系统为例,后面最后一章会讲如何启动加载ubuntu的文件系统.</p>
+
+<p>这时候我们不能继续使用busybox默认的linuxrc作为启动文件了,因为它时间上是一个busybox的连接,我们需要在根目录建立一个init的文件.init文件的内容如下:</p>
+
+<pre>
+<code class="language-bash">#!/bin/sh
+echo
+echo "###########################################################"
+echo "## THis is a init script example in ramdisk              ##"
+echo "###########################################################"
+echo
+ 
+PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+ 
+if [ ! -f "/bin/busybox" ];then
+  echo "cat not find busybox in /bin dir, exit"
+  exit 1
+fi
+ 
+BUSYBOX="/bin/busybox"
+ 
+echo "build root filesystem..."
+$BUSYBOX --install -s
+ 
+if [ ! -d /proc ];then
+  echo "/proc dir not exist, create it..."
+  $BUSYBOX mkdir /proc
+fi
+echo "mount proc fs..."
+$BUSYBOX mount -t proc proc /proc
+ 
+if [ ! -d /dev ];then
+  echo "/dev dir not exist, create it..."
+  $BUSYBOX mkdir /dev
+fi
+# echo "mount tmpfs in /dev..."
+# $BUSYBOX mount -t tmpfs dev /dev
+ 
+$BUSYBOX mkdir -p /dev/pts
+echo "mount devpts..."
+$BUSYBOX mount -t devpts devpts /dev/pts
+ 
+if [ ! -d /sys ];then
+  echo "/sys dir not exist, create it..."
+  $BUSYBOX mkdir /sys
+fi
+echo "mount sys fs..."
+$BUSYBOX mount -t sysfs sys /sys
+ 
+echo "/sbin/mdev" &gt; /proc/sys/kernel/hotplug
+echo "populate the dev dir..."
+$BUSYBOX mdev -s
+ 
+echo "dev filesystem is ok now, log all in kernel kmsg" &gt;&gt; /dev/kmsg
+ 
+echo "you can add some third part driver in this phase..." &gt;&gt; /dev/kmsg
+echo "begin switch root directory to sd card" &gt;&gt; /dev/kmsg
+ 
+$BUSYBOX mkdir /newroot
+if [ ! -b "/dev/mmcblk0" ];then
+  echo "can not find /dev/mmcblk0, please make sure the sd \
+    card is attached correctly!" &gt;&gt; /dev/kmsg
+  echo "drop to shell" &gt;&gt; /dev/kmsg
+  $BUSYBOX sh
+else
+  $BUSYBOX mount /dev/mmcblk0 /newroot
+  if [ $? -eq 0 ];then
+    echo "mount root file system successfully..." &gt;&gt; /dev/kmsg
+  else
+    echo "failed to mount root file system, drop to shell" &gt;&gt; /dev/kmsg
+    $BUSYBOX sh
+  fi
+fi
+ 
+# the root file system is mounted, clean the world for new root file system
+echo "" &gt; /proc/sys/kernel/hotplug
+$BUSYBOX umount -f /proc
+$BUSYBOX umount -f /sys
+$BUSYBOX umount -f /dev/pts
+# $BUSYBOX umount -f /dev
+ 
+echo "enter new root..." &gt;&gt; /dev/kmsg
+exec $BUSYBOX switch_root -c /dev/console /newroot /linuxrc
+ 
+if [ $? -ne 0 ];then
+  echo "enter new root file system failed, drop to shell" &gt;&gt; /dev/kmsg
+  $BUSYBOX mount -t proc proc /proc
+  $BUSYBOX sh
+fi
+</code></pre>
+
+<p>上面文件中这一句指定了下一步跳转到新文件系统的中linuxrc文件,如果启动文件不一样,需要修改这个脚本的这一句话.</p>
+
+<blockquote>
+<p>exec $BUSYBOX switch_root -c /dev/console /newroot /linuxrc</p>
+</blockquote>
+
+<p>保存后文件系统大概是这个样子的:</p>
+
+<pre>
+<code>bin  init  linuxrc  sbin  usr</code></pre>
+
+<p>然后适当调整启动命令如下:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -initrd ramdisk.gz -append "root=/dev/ram0 clocksource=pit rw console=tty0 rdinit=/init" -sd rootfs.ext3</p>
+</blockquote>
+
+<p>其中rdinit=/init把ramdisk的启动文件改为了刚才我们写的脚本init,然后-sd rootfs.ext3把我们上一章做好的文件系统以sd的形式挂载到了当前的qemu系统.</p>
+
+<p>运行后你会看到如下的信息:</p>
+
+<pre>
+<code>begin switch root directory to sd card
+EXT4-fs (mmcblk0): mounting ext3 file system using the ext4 subsystem
+EXT4-fs (mmcblk0): recovery complete
+EXT4-fs (mmcblk0): mounted filesystem with ordered data mode. Opts: (null)
+mount root file system successfully...
+enter new root...
+Please press Enter to activate this console. </code></pre>
+
+<p>从日志中你可以看出,首先启动ramdisk的init,然后挂载了sd卡,然后从把更目录切换到了sd卡,然后从sd卡启动了linuxrc文件.</p>
+
+<p>当然你也可以使用下面的命令:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -initrd ramdisk.gz -append "root=/dev/ram0 clocksource=pit rw console=ttyAMA0 rdinit=/init" -sd rootfs.ext3 -serial stdio -smp 4</p>
+</blockquote>
+
+<p>其中console=ttyAMA0指定了新的串口,这个串口是和HOST相通的,然后用-serial stdio把串口连接到了我们的标准输入输出端口(也就是我们现在敲命令的地方),然后-smp 4制定了我们使用4核的处理器.启动成功后你就可以在HOST的console输入命令了.</p>
+
+<p> </p>
+
+<p><strong>鸣谢:</strong>本文部分内容来自下面的链接,感谢相关作者的贡献.如侵权或需要删除请联系我.</p>
+
+<p><a href="https://blog.csdn.net/wys7250578/article/details/9045237">https://blog.csdn.net/wys7250578/article/details/9045237</a></p>
+
+<p><a href="https://blog.csdn.net/love_gaohz/article/details/41041781">https://blog.csdn.net/love_gaohz/article/details/41041781</a></p>
+
+<p><a href="https://www.jianshu.com/p/c0d8107f161e" rel="nofollow">https://www.jianshu.com/p/c0d8107f161e</a></p>
+
+<p> </p>
+                                    </div>
+                                </div>

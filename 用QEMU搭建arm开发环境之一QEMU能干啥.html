@@ -1,0 +1,76 @@
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>故事开始,巧妇难为无米之炊</h1>
+
+<p>    小朱一上班就急忙来找大鹏,"鹏哥,硬件开发告诉我因为有一部分物料还没按期交付,所以两周后才能拿到开发版.这样下去一定会影响我们软件组的嵌入式QT软件的开发进度的,我们怎么办呀?",大鹏听了微微一笑,"你做安卓开发的时候,没有手机是怎么开发的?",小朱回答:"Android Studio自带模拟器啊?哦,你是说我们也可以用模拟器开发?我们能用什么模拟器呢?""大名鼎鼎的QEMU就可以,实际上安卓开发的模拟器也是基于QEMU的,我们去会议室,我来讲下这个模拟器."</p>
+
+<h2>QEMU是什么</h2>
+
+<p>QEMU是一套由<a href="https://baike.baidu.com/item/%E6%B3%95%E5%B8%83%E9%87%8C%E6%96%AF%C2%B7%E8%B4%9D%E6%8B%89/9358492" rel="nofollow">法布里斯·贝拉</a>(Fabrice Bellard)所编写的以<a href="https://baike.baidu.com/item/GPL" rel="nofollow">GPL</a>许可证分发源码的模拟处理器，最先在<a href="https://baike.baidu.com/item/GNU%2FLinux" rel="nofollow">GNU/Linux</a>平台上使用广泛。目前，0.9.1及之前版本的qemu可以使用<a href="https://baike.baidu.com/item/kqemu" rel="nofollow">kqemu</a>加速器。在qemu1.0之后的版本，都无法使用<a href="https://baike.baidu.com/item/kqemu" rel="nofollow">kqemu</a>，主要利用qemu-<a href="https://baike.baidu.com/item/kvm/522955" rel="nofollow">kvm</a>加速模块，并且加速效果以及稳定性明显好于<a href="https://baike.baidu.com/item/kqemu" rel="nofollow">kqemu</a>。</p>
+
+<p>QEMU能够模拟多种处理器,所以你可以使用QEMU在PC机上模拟一个ARM的安卓系统或者PowerPC的一个Unix系统.所以,我们也可以用QEMU建立一个ARM+Linux内核+QT运行环境的系统,用来模拟我们现在的嵌入式QT开发环境.</p>
+
+<p>Qemu 是纯软件实现的虚拟化模拟器，几乎可以模拟任何硬件设备，我们最熟悉的就是能够模拟一台能够独立运行操作系统的虚拟机，虚拟机认为自己和硬件打交道，但其实是和 Qemu 模拟出来的硬件打交道，Qemu 将这些指令转译给真正的硬件。但是,正因为 Qemu 是纯软件实现的，所有的指令都要经 Qemu 过一手，性能非常低，所以，一般用于早期开发.</p>
+
+<p><img alt="" src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9pbWFnZXMyMDE3LmNuYmxvZ3MuY29tL2Jsb2cvNDMxNTIxLzIwMTcxMS80MzE1MjEtMjAxNzExMTgyMTM1MjI4NDMtMzIyNzIxNjk3LnBuZw?x-oss-process=image/format,png" /></p>
+
+<h2> </h2>
+
+<h2>QEMU能干什么</h2>
+
+<p>大鹏接着说,"我之前项目过程中已经用过QEMU,我来给你展示一下QEMU的效果".</p>
+
+<p><u><strong>在QEMU下使用DirectFB进行GUI开发,Demo演示如下.</strong></u></p>
+
+<p><img alt="" height="886" src="https://img-blog.csdnimg.cn/20200709121252570.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2xpb25maXJl,size_16,color_FFFFFF,t_70" width="1076" /></p>
+
+<p>上图所示演示image下载路径如下:<a href="https://bootlin.com/pub/qemu/demos/arm/directfb/1.0/vmlinuz-qemu-arm-2.6.20" rel="nofollow">vmlinuz-qemu-arm-2.6.20</a>,</p>
+
+<p>Windows下QEMU安装文件:链接：https://pan.baidu.com/s/1mLw4pqdp9Q8JxYkrXRfbbg 提取码：3qq4</p>
+
+<p>下载上述两个文件,并安装QEMU后,运行如下命令:</p>
+
+<p><span style="color:#3399ea;">"D:\Program Files\qemu\qemu-system-arm.exe" -M versatilepb -m 16 -kernel vmlinuz-qemu-arm-2.6.20 -append "clocksource=pit quiet rw"</span></p>
+
+<p> </p>
+
+<p><u><strong>QEMU下Ubuntu运行演示</strong></u></p>
+
+<p><img alt="" height="839" src="https://img-blog.csdnimg.cn/20200709125241210.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2xpb25maXJl,size_16,color_FFFFFF,t_70" width="1028" /></p>
+
+<p>ubuntu 18 文件系统下载地址如下:链接：https://pan.baidu.com/s/1qYmiqvL6nPx3LY8gDIylIw 提取码：68lc</p>
+
+<p>内核与DTB文件下载地址如下:链接：https://pan.baidu.com/s/1WmRMtAxddu69SbaUqRma8Q 提取码：up22</p>
+
+<p>下载上述文件,解压缩文件系统,和内核文件以及DTB文件放在同一个目录,然后运行如下命令:</p>
+
+<p><span style="color:#3399ea;">"D:\Program Files\qemu\qemu-system-arm.exe" -M vexpress-a9 -m 1024M -kernel zImage -dtb vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0 rw console=ttyAMA0" -sd rootfsubuntu18lxde.ext3 -serial stdio -smp 4</span></p>
+
+<p> </p>
+
+<p> </p>
+
+<h2>如何用QEMU搭建嵌入式ARM QT运行环境</h2>
+
+<p>      看完上面的演示,我们可以看到QEMU能够做很多事情,甚至可以把Ubuntu这样的系统完整的运行起来.所以,用QEMU搭建QT运行环境绝对是小菜一碟.我们下面来说说,一个嵌入式系统是如何组成的,又是怎么运行起来的.</p>
+
+<p>一个完整的嵌入式系统(比如安卓),主要包含如下几个部分:</p>
+
+<ol><li>bootloader:也就是加载器,通常这是CPU上电后第一个启动的软件,它负责初始化整个硬件(特别是DDR,其他依据需求来添加),初始化成功后,开始从存储器加载内核到DDR中,然后开始启动内核.bootloader有很多种,u-boot是比较常用的一种.</li>
+	<li>内核:内核是操作系统的核心部分,所以bootloader的主要目的就是为了加载内核.如果是linux系统,在3.0以上的版本中出来内核文件,还需要一个DTB文件来配合启动.DTB文件是用来描述设备连接方法和引脚定义的.</li>
+	<li>ramdisk:内核启动结束后,需要加载文件系统和启动0号进程.文件系统是用来存放内核启动后应用层的各种系统文件的,当然也用来存储用户使用操作系统过程中建立的文件.0号进程是指内核启动结束后启动的第一个程序.文件系统可以用很多种,内核通常也支持多种文件系统,使用RAMDISK是比较常见的作法,原理上它是使用内存作为存储介质来建立的一种文件系统,由bootload在启动内核的时候,读取到内存中,它有体积小,启动速度快,安全性高等多种特性.</li>
+	<li>文件系统:内核或者RAMDISK启动成功后就可以正式的进入user space的操作系统部分了,这也是我们日常使用操作系统中最常接触到的部分,系统提供的文件或者我们的文件都是存在这里的.</li>
+</ol><p>各组成部分大致启动顺序如下:</p>
+
+<p><img alt="" height="681" src="https://img-blog.csdnimg.cn/20200709134644447.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2xpb25maXJl,size_16,color_FFFFFF,t_70" width="831" /></p>
+
+<p> </p>
+
+<p><strong>鸣谢:</strong>本文部分内容来自如下链接,如侵权或需删除请联系我.</p>
+
+<p><a href="https://www.cnblogs.com/bakari/p/7858029.html" rel="nofollow">https://www.cnblogs.com/bakari/p/7858029.html</a></p>
+
+<p><a href="https://bootlin.com/blog/qemu-arm-directfb-demo/" rel="nofollow">https://bootlin.com/blog/qemu-arm-directfb-demo/</a></p>
+                                    </div>
+                                </div>
