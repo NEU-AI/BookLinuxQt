@@ -1,0 +1,98 @@
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>1.在BusyBox增加交叉编译运行环境</h1>
+
+<p>之前的章节我们已经完成了从内核启动ramdisk,然后ramdisk挂载一个外部存储,并跳转到外部存储上的文件系统的过程.但是我们还没有在这个模拟系统中运行我们自己写的程序.</p>
+
+<p>在自己写程序之前我们必须建立交叉编译环境,在HOST端,这个交叉编译环境已经建好了(请参见<a href="https://blog.csdn.net/lionfire/article/details/107227218"> 用QEMU搭建arm开发环境之二:QEMU启动内核</a>这一章的内容).但是在qemu里面还需要加入对应的运行环境.这个运行系统所需的文件在我们解压arm-linux-gcc-4.6.4-arm-x86_64.tar.bz2这个文件后的opt/TuxamitoSoftToolchains/arm-arm1176jzfssf-linux-gnueabi/gcc-4.6.4/arm-arm1176jzfssf-linux-gnueabi/sysroot下.目录下的文件大约是这样的:</p>
+
+<pre>
+<code>etc  lib  lib32  lib64  sbin  usr  var</code></pre>
+
+<p>我们需要重新挂载刚才做好的busybox的文件系统,然后把上面的文件复制进去:</p>
+
+<pre>
+<code>cp rootfs.ext3 rootfsbak.ext3
+sudo mount rootfs.ext3 mnt
+cd mnt
+sudo cp -rf ~/qemuwork/tmp/opt/TuxamitoSoftToolchains/arm-arm1176jzfssf-linux-gnueabi/gcc-4.6.4/arm-arm1176jzfssf-linux-gnueabi/sysroot/* .
+cd ..
+sudo umount mnt</code></pre>
+
+<p>修改成功后,我们再次启动看看是否能够正常启动</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -initrd ramdisk.gz -append "root=/dev/ram0 clocksource=pit rw console=tty0 rdinit=/init" -sd rootfs.ext3</p>
+</blockquote>
+
+<h1><br />
+2.编写第一个程序HelloQEMU</h1>
+
+<p>上面我们修改文件系统后,并没有检查是否能够正常运行我们写的程序,所以我们这里要写一个程序来试一下.</p>
+
+<pre>
+<code>cd ~/src
+vi test.c</code></pre>
+
+<p>上面我们建立一个test.c文件,然后输入如下内容:</p>
+
+<pre>
+<code class="language-cpp">#include&lt;stdio.h&gt;
+
+int main()
+{
+	printf("hello world!\n");
+	return 0;
+}
+</code></pre>
+
+<p>保存后,使用如下命令编译:</p>
+
+<pre>
+<code class="language-bash">arm-none-linux-gnueabi-gcc test.c -o test</code></pre>
+
+<h1><br />
+3.下载并运行HelloQEMU</h1>
+
+<p>编译成功后的test文件我们需要放入到rootfs中.</p>
+
+<pre>
+<code>sudo mount rootfs.ext3 mnt
+cd mnt
+sudo mkdir root
+sudo cp ~/src/test root/
+cd ..
+sudo umount mnt</code></pre>
+
+<p>然后我们再次启动qemu,执行如下命令:</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -initrd ramdisk.gz -append "root=/dev/ram0 clocksource=pit rw console=ttyAMA0 rdinit=/init" -sd rootfs.ext3 -serial stdio -smp 4</p>
+</blockquote>
+
+<p>启动成功后,测试一下:</p>
+
+<pre>
+<code class="language-bash">/ # ls
+bin      etc      lib32    linuxrc  root     sys      var
+dev      lib      lib64    proc     sbin     usr
+/ # cd root
+/root # ls
+test
+/root # ./test
+hello world!
+/root # 
+</code></pre>
+
+<p>至此交叉编译后的运行环境搭建成功.</p>
+
+<p> </p>
+
+<p><strong>鸣谢:</strong>本文部分内容来自下面的链接,感谢相关作者的贡献.如侵权或需要删除请联系我.</p>
+
+<p><a href="https://www.cnblogs.com/tansuoxinweilai/p/11602830.html" rel="nofollow">https://www.cnblogs.com/tansuoxinweilai/p/11602830.html</a></p>
+
+<p> </p>
+                                    </div>
+                                </div>

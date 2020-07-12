@@ -1,0 +1,229 @@
+<div id="article_content" class="article_content clearfix">
+            <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-211130ba7a.css" />
+                            <div class="htmledit_views" id="content_views">
+                                            <h1>交叉编译</h1>
+
+<p>通常我们在windows下开发的时候,开发的环境是windows,CPU是x86的,运行环境和开发环境相同.这时候不需要交叉编译.但是我们开发嵌入式程序的时候,开发环境是Windows(或者Linux)运行环境的CPU是ARM的,这时候需要使用交叉编译.</p>
+
+<p>交叉编译是在一个平台上生成另一个平台上的可执行代码。同一个体系结构可以运行不同的操作系统；同样，同一个操作系统也可以在不同的体系结构上运行。上面所说的X86上运行的Windows环境下开发运行在ARM上Linux环境下的程序就需要用交叉编译.</p>
+
+<p>一个经常会被问到的问题就是，“既然我们已经有了主机编译器，那为什么还要交叉编译呢？”其实答案很简单。有时是因为目的平台上不允许或不能够安装我们所需要的编译器，而我们又需要这个编译器的某些特征；有时是因为目的平台上的资源贫乏，无法运行我们所需要编译器；有时又是因为目的平台还没有建立，连操作系统都没有，根本谈不上运行什么编译器。另一个经常会被问到的问题就是：“既然可以交叉编译，那还要主机编译干吗？”其实答案也很简单，交叉编译是不得已而为之！与主机编译相比，交叉编译受的限制更多，虽然在理论上我们可以做任何形式的交叉编译，但事实上，由于受到专利、版权、技术的限制，并不总是能够进行交叉编译，尤其是在业余条件下！就我们这个项目而言，需要交叉编译的原因有两个：首先，在项目的起始阶段，目的平台尚未建立，因此需要做交叉编译，以生成我们所需要的bootloader（启动引导代码）以及操作系统核心；其次，当目的平台能启动之后，由于目的平台上资源的限制，当我们编译大型程序时，依然可能需要用到交叉编译。</p>
+
+<h1>在Ubuntu下搭建交叉编译环境</h1>
+
+<p>虽然说理论上可以在Windows下通过交叉编译来制作ARM版本的Linux内核,但是一般情况下这个工作都是在Linux下进行.下面我们以Ubuntu16.04为例,说明如何搭建编译内核的开发环境.</p>
+
+<p>安装交叉编译器有两种方法.</p>
+
+<p><u><strong>第一种方法使用ubuntu自带的apt-get来安装.</strong></u></p>
+
+<p>比如我们选择arm-linux-gnueabi-gcc-4.7作为交叉编译器,</p>
+
+<blockquote>
+<p>sudo apt install gcc-4.7-arm-linux-gnueabi</p>
+</blockquote>
+
+<p>这种方法比较简单,但是默认ubuntu的源,上面的命令执行的时候可能会比较慢,这时候需要修改下载源的清单文件.</p>
+
+<blockquote>
+<p>vi /etc/apt/sources.list</p>
+</blockquote>
+
+<p>我选择加入了阿里云的源地址,所以在文件内加入如下内容:</p>
+
+<blockquote>
+<p>deb-src http://archive.ubuntu.com/ubuntu xenial main restricted #Added by software-properties<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial main restricted<br />
+deb-src http://mirrors.aliyun.com/ubuntu/ xenial main restricted multiverse universe #Added by software-properties<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-updates main restricted<br />
+deb-src http://mirrors.aliyun.com/ubuntu/ xenial-updates main restricted multiverse universe #Added by software-properties<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial universe<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-updates universe<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial multiverse<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-updates multiverse<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-backports main restricted universe multiverse<br />
+deb-src http://mirrors.aliyun.com/ubuntu/ xenial-backports main restricted universe multiverse #Added by software-properties<br />
+deb http://archive.canonical.com/ubuntu xenial partner<br />
+deb-src http://archive.canonical.com/ubuntu xenial partner<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-security main restricted<br />
+deb-src http://mirrors.aliyun.com/ubuntu/ xenial-security main restricted multiverse universe #Added by software-properties<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-security universe<br />
+deb http://mirrors.aliyun.com/ubuntu/ xenial-security multiverse</p>
+</blockquote>
+
+<p>当然你也可以选择其他的源,比如清华或者科大的.更新soures.list后,需要执行如下命令让apt自己从源下载更新packege的列表</p>
+
+<blockquote>
+<p>sudo apt update</p>
+</blockquote>
+
+<p>更新成功后重新执行最初的sudo apt install gcc-4.7-arm-linux-gnueabi命令就会快很多.</p>
+
+<p>如果安装成功,输入命令arm-linux-gnueabi-gcc --version看到类似如下的内容说明安装成功.</p>
+
+<blockquote>
+<p>arm-linux-gnueabi-gcc (Ubuntu/Linaro 4.7.4-3ubuntu12) 4.7.4<br />
+Copyright (C) 2012 Free Software Foundation, Inc.<br />
+This is free software; see the source for copying conditions.  There is NO<br />
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
+</blockquote>
+
+<p><u><strong>第二种方法使用源码编译来安装.</strong></u></p>
+
+<p>这里我在网上找到一个已经编译好的arm-linux-gnueabi-gcc-4.6,下载地址如下:</p>
+
+<blockquote>
+<p>链接：https://pan.baidu.com/s/10WshRDKx3e2Yw7w34xNMDw <br />
+提取码：lvni</p>
+</blockquote>
+
+<p>下载成功后,解压缩,然后将opt/TuxamitoSoftToolchains/arm-arm1176jzfssf-linux-gnueabi/gcc-4.6.4下的所有文件复制到新建的目录/usr/local/arm/gcc-4.6.4/下面.</p>
+
+<blockquote>
+<p>sudo mkdir /usr/local/arm/gcc-4.6.4/</p>
+
+<p>mkdir tmp</p>
+
+<p>cd tmp</p>
+
+<p>tar jxvf ../arm-linux-gcc-4.6.4-arm-x86_64.tar.bz2</p>
+
+<p>sudo cp -rf opt/TuxamitoSoftToolchains/arm-arm1176jzfssf-linux-gnueabi/gcc-4.6.4/* /usr/local/arm/gcc-4.6.4/</p>
+</blockquote>
+
+<p>然后设置环境变量</p>
+
+<blockquote>
+<p>export PATH=$PATH:/usr/local/arm/gcc-4.6.4/bin<br />
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/arm/gcc-4.6.4/lib</p>
+</blockquote>
+
+<p>第一行是用来指定可执行文件路径的,第二行是用来指定库文件路径的.</p>
+
+<p>你可以把上述命令加入到/etc/profile或者~/.bashrc里面,这样下次打开终端的时候就会自动设置上述环境变量.</p>
+
+<p>如果安装成功,执行命令arm-none-linux-gnueabi-gcc --version,看到类似如下的内容说明安装成功了.</p>
+
+<blockquote>
+<p>arm-none-linux-gnueabi-gcc (crosstool-NG hg+unknown-20130521.154019 - tc0002) 4.6.4<br />
+Copyright (C) 2011 Free Software Foundation, Inc.<br />
+This is free software; see the source for copying conditions.  There is NO<br />
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</p>
+</blockquote>
+
+<h1>下载并编译内核源码</h1>
+
+<p>内核下载官网:<a href="https://www.kernel.org/" rel="nofollow">https://www.kernel.org/</a>,我选择了linux-4.4.229这个版本,你也可以选择其他版本,其他版本的编译过程也是类似的.如果官网下载比较慢的话,可以从下面这里下载:</p>
+
+<blockquote>
+<p>链接：https://pan.baidu.com/s/1NFGSYQWZlgVuAy6yXu-xpQ <br />
+提取码：g00g</p>
+</blockquote>
+
+<p>编译成功后使用命令tar xvf linux-4.4.229.tar.xz解压缩,然后进入解压后的目录.</p>
+
+<pre>
+<code>$ls arch/arm/configs/
+
+acs5k_defconfig        cns3420vb_defconfig       ezx_defconfig         ixp4xx_defconfig      moxart_defconfig     nuc960_defconfig      raumfeld_defconfig      spear3xx_defconfig    viper_defconfig
+acs5k_tiny_defconfig   colibri_pxa270_defconfig  footbridge_defconfig  jornada720_defconfig  multi_v5_defconfig   omap1_defconfig       realview_defconfig      spear6xx_defconfig    vt8500_v6_v7_defconfig
+am200epdkit_defconfig  colibri_pxa300_defconfig  h3600_defconfig       keystone_defconfig    multi_v7_defconfig   omap2plus_defconfig   realview-smp_defconfig  spitz_defconfig       xcep_defconfig
+assabet_defconfig      collie_defconfig          h5000_defconfig       ks8695_defconfig      mv78xx0_defconfig    orion5x_defconfig     rpc_defconfig           stm32_defconfig       zeus_defconfig
+at91_dt_defconfig      corgi_defconfig           hackkit_defconfig     lart_defconfig        mvebu_v5_defconfig   palmz72_defconfig     s3c2410_defconfig       sunxi_defconfig       zx_defconfig
+axm55xx_defconfig      davinci_all_defconfig     hisi_defconfig        lpc18xx_defconfig     mvebu_v7_defconfig   pcm027_defconfig      s3c6400_defconfig       tct_hammer_defconfig
+badge4_defconfig       dove_defconfig            imote2_defconfig      lpc32xx_defconfig     mxs_defconfig        pleb_defconfig        s5pv210_defconfig       tegra_defconfig
+bcm2835_defconfig      ebsa110_defconfig         imx_v4_v5_defconfig   lpd270_defconfig      neponset_defconfig   prima2_defconfig      sama5_defconfig         trizeps4_defconfig
+bcm_defconfig          efm32_defconfig           imx_v6_v7_defconfig   lubbock_defconfig     netwinder_defconfig  pxa168_defconfig      shannon_defconfig       u300_defconfig
+cerfcube_defconfig     em_x270_defconfig         integrator_defconfig  magician_defconfig    netx_defconfig       pxa255-idp_defconfig  shmobile_defconfig      u8500_defconfig
+clps711x_defconfig     ep93xx_defconfig          iop13xx_defconfig     mainstone_defconfig   nhk8815_defconfig    pxa3xx_defconfig      simpad_defconfig        versatile_defconfig
+cm_x2xx_defconfig      eseries_pxa_defconfig     iop32x_defconfig      mini2440_defconfig    nuc910_defconfig     pxa910_defconfig      socfpga_defconfig       vexpress_defconfig
+cm_x300_defconfig      exynos_defconfig          iop33x_defconfig      mmp2_defconfig        nuc950_defconfig     qcom_defconfig        spear13xx_defconfig     vf610m4_defconfig</code></pre>
+
+<p>上面列出来的这个内核默认已经支持的各种平台,versatile_defconfig和vexpress_defconfig都是比较常见的qemu支持的内核版本.</p>
+
+<p>在解压内核的根目录,执行如下命令来配置内核将要编译的平台:</p>
+
+<blockquote>
+<p>make vexpress_defconfig</p>
+</blockquote>
+
+<p>编译成功会在内核根目录建立一个.config的文件,这个文件是当前编译的配置文件,通过make menuconfig可以手工修改这个文件.</p>
+
+<p>根据你安装的交叉编译器的版本,执行如下命令开始编译内核:</p>
+
+<blockquote>
+<p>ARM=arm CROSS_COMPILE=arm-linux-gnueabi- make -j16</p>
+</blockquote>
+
+<p>或者</p>
+
+<blockquote>
+<p>ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- make -j16</p>
+</blockquote>
+
+<p>上述命令中ARCH=arm是指定编译的CPU架构是arm,而CROSS_COMPILE=arm-none-linux-gnueabi是指定交叉编译工具,最后的-j16是使用16个线程进行编译,通常选择你当前电脑CPU数量的二倍.</p>
+
+<p>没有出现提示错误一般就编译成功了,常见编译后会出现类似如下的信息:</p>
+
+<blockquote>
+<p>  AS      arch/arm/boot/compressed/piggy.gzip.o<br />
+  LD      arch/arm/boot/compressed/vmlinux<br />
+  OBJCOPY arch/arm/boot/zImage<br />
+  Kernel: arch/arm/boot/zImage is ready</p>
+</blockquote>
+
+<h1>如何用QEMU启动内核</h1>
+
+<p>内核文件arch/arm/boot/zImage就是我们最后编译成功的内核文件.我们来尝试启动一下这个内核.命令中-M指定内核运行的平台,-m指定内存大小,-kernel指定内核文件,-dtb指定设备树定义文件.</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel arch/arm/boot/zImage -dtb arch/arm/boot/dts/vexpress-v2p-ca9.dtb</p>
+</blockquote>
+
+<p>如果你看到小企鹅就说明启动已经成功了,但是你发现你还不能看到运行的日志,这是因为你没有指定内核的日志输出到哪里.我们使用如下命令来指定内核日志输出的端口.其中-append指定内核启动的参数(后续在uboot启动的时候,也可以在uboot指定这个参数,我们在这里把内核输出console指定到了ttyAMA0这个串口),-serail设定串口转发到host机标准输入输出控制台(也就是你当前打命令的地方)</p>
+
+<blockquote>
+<p>qemu-system-arm -M vexpress-a9 -m 512M -kernel arch/arm/boot/zImage -dtb arch/arm/boot/dts/vexpress-v2p-ca9.dtb -append "root=/dev/mmcblk0 rw console=ttyAMA0" -serial stdio</p>
+</blockquote>
+
+<p>这时候就能看到启动的时候,内核输出的日志了.最后停在如下位置是因为内核启动完成后尝试启动文件系统但是没有找到.</p>
+
+<blockquote>
+<p>VFS: Cannot open root device "mmcblk0" or unknown-block(0,0): error -6<br />
+Please append a correct "root=" boot option; here are the available partitions:<br />
+1f00          131072 mtdblock0  (driver?)<br />
+1f01           32768 mtdblock1  (driver?)<br />
+Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)<br />
+CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.229+ #7<br />
+Hardware name: ARM-Versatile Express<br />
+[&lt;800155e8&gt;] (unwind_backtrace) from [&lt;80011ffc&gt;] (show_stack+0x10/0x14)<br />
+[&lt;80011ffc&gt;] (show_stack) from [&lt;80247198&gt;] (dump_stack+0x84/0xa4)<br />
+[&lt;80247198&gt;] (dump_stack) from [&lt;800a3428&gt;] (panic+0x8c/0x1f4)<br />
+[&lt;800a3428&gt;] (panic) from [&lt;8063b1cc&gt;] (mount_block_root+0x190/0x250)<br />
+[&lt;8063b1cc&gt;] (mount_block_root) from [&lt;8063b384&gt;] (mount_root+0xf8/0x11c)<br />
+[&lt;8063b384&gt;] (mount_root) from [&lt;8063b4d0&gt;] (prepare_namespace+0x128/0x18c)<br />
+[&lt;8063b4d0&gt;] (prepare_namespace) from [&lt;8063ae5c&gt;] (kernel_init_freeable+0x21c/0x268)<br />
+[&lt;8063ae5c&gt;] (kernel_init_freeable) from [&lt;804acf58&gt;] (kernel_init+0x8/0xe4)<br />
+[&lt;804acf58&gt;] (kernel_init) from [&lt;8000f350&gt;] (ret_from_fork+0x14/0x24)<br />
+---[ end Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)</p>
+</blockquote>
+
+<p>恭喜你,到这里内核启动成功.后续我们讲解如何制作文件系统.</p>
+
+<p> </p>
+
+<p><strong>鸣谢:</strong>本文部分资料参考来源于如下链接,感谢相关作者的贡献,如侵权或需删除,请联系我.</p>
+
+<p><a href="https://baike.baidu.com/item/%E4%BA%A4%E5%8F%89%E7%BC%96%E8%AF%91/10916911?fr=aladdin" rel="nofollow">https://baike.baidu.com/item/%E4%BA%A4%E5%8F%89%E7%BC%96%E8%AF%91/10916911?fr=aladdin</a></p>
+
+<p><a href="https://www.cnblogs.com/tansuoxinweilai/p/11602830.html" rel="nofollow">https://www.cnblogs.com/tansuoxinweilai/p/11602830.html</a></p>
+
+<p><a href="https://blog.csdn.net/ReCclay/article/details/102314361">https://blog.csdn.net/ReCclay/article/details/102314361</a></p>
+
+<p><a href="https://www.jianshu.com/p/c0d8107f161e" rel="nofollow">https://www.jianshu.com/p/c0d8107f161e</a></p>
+
+<p> </p>
+
+<p> </p>
+                                    </div>
+                                </div>
