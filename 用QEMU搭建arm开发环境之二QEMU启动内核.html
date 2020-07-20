@@ -144,7 +144,7 @@ cm_x300_defconfig      exynos_defconfig          iop33x_defconfig      mmp2_defc
 <p>在解压内核的根目录,执行如下命令来配置内核将要编译的平台:</p>
 
 <blockquote>
-<p>make vexpress_defconfig</p>
+<p>ARCH=arm make vexpress_defconfig</p>
 </blockquote>
 
 <p>编译成功会在内核根目录建立一个.config的文件,这个文件是当前编译的配置文件,通过make menuconfig可以手工修改这个文件.</p>
@@ -152,7 +152,7 @@ cm_x300_defconfig      exynos_defconfig          iop33x_defconfig      mmp2_defc
 <p>根据你安装的交叉编译器的版本,执行如下命令开始编译内核:</p>
 
 <blockquote>
-<p>ARM=arm CROSS_COMPILE=arm-linux-gnueabi- make -j16</p>
+<p>ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- make -j16</p>
 </blockquote>
 
 <p>或者</p>
