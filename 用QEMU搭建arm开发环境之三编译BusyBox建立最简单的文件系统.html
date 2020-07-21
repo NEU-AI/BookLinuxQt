@@ -35,7 +35,7 @@
 
 <p>你可以直接编辑.config将# CONFIG_STATIC is not set这句话改为CONFIG_STATIC=y</p>
 
-<p>或者你也可以执行下面的命令在菜单上修改:</p>
+<p>或者你也可以执行下面的命令在菜单上修改:如果报错,请执行sudo apt-get install libncurses5-dev安装相关工具软件</p>
 
 <blockquote>
 <p>make menuconfig</p>
@@ -59,7 +59,7 @@
 mkfs.ext3 rootfs.ext3
 sudo mount -t ext3 rootfs.ext3 mnt
 cd mnt
-cp -rf busybox-1.21.0/_install/* .
+cp -rf ../../busybox-1.21.0/_install/* .
 cd ..
 sudo umount mnt</code></pre>
 
